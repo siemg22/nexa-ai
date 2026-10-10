@@ -93,12 +93,20 @@ NexaAI integrates with OpenRouter to access AI models.
 - Expand usage analytics and credit management.
 - Improve error handling and AI response states.
 - Add more personalization and AI tools.
+  
+## 🌐 Live Demo
+
+- **Live Demo:** [NexaAI](https://nexa-ai10.netlify.app/)
+- **GitHub Repository:** [siemg22/nexa-ai](https://github.com/siemg22/nexa-ai)
+
+
 
 ## 👨‍💻 Author
 
 **Siem Gebrehiwot**
 
 - GitHub: [@siemg22](https://github.com/siemg22)
+  
 
 ## 📄 License
 
