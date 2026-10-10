@@ -31,42 +31,23 @@ function Chat({setHistory}) {
         setLoading(true);
 
         try {
-            const response = await fetch(
-                "https://openrouter.ai/api/v1/chat/completions",
+                    const response = await fetch("/.netlify/functions/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                messages: [
                 {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`
-                    },
-
-                    body: JSON.stringify({
-                        model: "openrouter/free",
-
-                        messages: [
-                            {
-                                role: "system",
-                                content:
-                                    "You are NexaAI, a helpful, friendly and professional AI assistant."
-                            },
-
-                            ...messages.map((item) => ({
-                                role:
-                                    item.sender === "user"
-                                        ? "user"
-                                        : "assistant",
-                                content: item.text
-                            })),
-
-                            {
-                                role: "user",
-                                content: userText
-                            }
-                        ]
-                    })
-                }
-            );
+                    role: "system",
+                    content:
+                    "You are NexaAI, a helpful, friendly and professional AI assistant.",
+                },
+                ...messages,
+                { role: "user", content: userMessage },
+                ],
+            }),
+            });
 
             const data = await response.json();
 

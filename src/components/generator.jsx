@@ -57,18 +57,12 @@ Provide several useful ideas with a short explanation for each one.
     }
 
     try {
-        const response = await fetch(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
+                    const response = await fetch("/.netlify/functions/chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${
-                        import.meta.env.VITE_OPENROUTER_API_KEY
-                    }`,
                 },
                 body: JSON.stringify({
-                    model: "openrouter/free",
                     messages: [
                         {
                             role: "system",
@@ -80,8 +74,7 @@ Provide several useful ideas with a short explanation for each one.
                         },
                     ],
                 }),
-            }
-        );
+            });
 
         if (!response.ok) {
             throw new Error("Failed to generate content");
