@@ -66,9 +66,24 @@ export default async (req) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model: "openrouter/free",
-          messages,
+       body: JSON.stringify({
+        model: "openrouter/free",
+        messages: [
+            {
+            role: "system",
+            content: `You are NexaAI, an intelligent and helpful AI assistant.
+
+        Always answer the user's actual question directly and naturally.
+        Never introduce yourself unless asked.
+        Never claim that your name is Gemma, ChatGPT, or another AI model.
+        Do not send generic greetings instead of answering questions.
+        Use clear, accurate, relevant answers and format them with Markdown when useful.
+        For coding questions, provide working code and concise explanations.
+        If a question requires live information you cannot access, explain that limitation honestly. Never invent current facts.
+        Keep answers focused on the user's request.`,
+            },
+            ...messages.filter((message) => message.role !== "system"),
+        ],
         }),
       }
     );
