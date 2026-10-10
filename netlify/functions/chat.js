@@ -1,3 +1,4 @@
+
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response(
@@ -24,6 +25,39 @@ export default async (req) => {
 
     const body = await req.json();
 
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Please provide valid messages." }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const messages = body.messages
+      .filter(
+        (item) =>
+          item &&
+          ["system", "user", "assistant"].includes(item.role) &&
+          typeof item.content === "string" &&
+          item.content.trim().length > 0
+      )
+      .map((item) => ({
+        role: item.role,
+        content: item.content.trim(),
+      }));
+
+    if (messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No valid messages were provided." }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -34,7 +68,7 @@ export default async (req) => {
         },
         body: JSON.stringify({
           model: "openrouter/free",
-          messages: body.messages,
+          messages,
         }),
       }
     );
@@ -45,7 +79,9 @@ export default async (req) => {
       status: response.status,
       headers: { "Content-Type": "application/json" },
     });
-  } catch {
+  } catch (error) {
+    console.error("Netlify AI function error:", error);
+
     return new Response(
       JSON.stringify({ error: "Unable to connect to the AI service." }),
       {
