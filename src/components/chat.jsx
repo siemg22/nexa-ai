@@ -1,330 +1,294 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-function Chat({setHistory}) {
+function Chat({ setHistory }) {
     const [message, setMessage] = useState("");
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+    const textareaRef = useRef(null);
 
-    const sendMessage = async () => {
-        if (!message.trim() || loading) {
-            return;
-        }
+    const getTime = () =>
+        new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
 
-        const userText = message.trim();
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+        });
+    }, [messages, loading]);
+
+    const sendMessage = async (text = message) => {
+        if (!text.trim() || loading) return;
+
+        const userText = text.trim();
 
         const userMessage = {
             id: Date.now(),
             sender: "user",
             text: userText,
-            time: new Date().toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit"
-            })
+            time: getTime(),
         };
 
-        setMessages((previousMessages) => [
-            ...previousMessages,
-            userMessage
-        ]);
+        const conversationHistory = messages
+            .filter((item) => !item.isError)
+            .slice(-20)
+            .map((item) => ({
+                role: item.sender === "user" ? "user" : "assistant",
+                content: item.text,
+            }));
 
+        setMessages((previous) => [...previous, userMessage]);
         setMessage("");
         setLoading(true);
 
         try {
-                    const response = await fetch("/.netlify/functions/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                messages: [
+            const response = await fetch(
+                "/.netlify/functions/chat",
                 {
-                    role: "system",
-                    content:
-                    "You are NexaAI, a helpful, friendly and professional AI assistant.",
-                },
-                ...messages,
-                { role: "user", content: userMessage },
-                ],
-            }),
-            });
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        messages: [
+                            ...conversationHistory,
+                            {
+                                role: "user",
+                                content: userText,
+                            },
+                        ],
+                    }),
+                }
+            );
 
-            const data = await response.json();
+            const data = await response.json().catch(() => null);
 
-            if (!response.ok) {
+            if (!response.ok || !data?.text) {
+                if (response.status === 404) {
+                    throw new Error(
+                        "The AI function was not found. Run the app with netlify dev or deploy it to Netlify."
+                    );
+                }
+
                 throw new Error(
-                    data?.error?.message ||
-                    "Something went wrong with the AI request."
+                    data?.error ||
+                        `Something went wrong (${response.status}).`
                 );
             }
 
-            const aiText =
-                data?.choices?.[0]?.message?.content ||
-                "Sorry, I couldn't generate a response.";
-
-            const aiMessage = {
-                id: Date.now() + 1,
-                sender: "ai",
-                text: aiText,
-                time: new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                })
-            };
-           
-
-            setMessages((previousMessages) => [
-                ...previousMessages,
-                aiMessage
+            setMessages((previous) => [
+                ...previous,
+                {
+                    id: Date.now() + 1,
+                    sender: "ai",
+                    text: data.text,
+                    time: getTime(),
+                },
             ]);
         } catch (error) {
-            console.error("OpenRouter error:", error);
+            console.error("Chat error:", error);
 
-            const errorMessage = {
-                id: Date.now() + 1,
-                sender: "ai",
-                text: `Sorry, I couldn't connect to the AI right now. ${error.message}`,
-                time: new Date().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                })
-            };
-
-            setMessages((previousMessages) => [
-                ...previousMessages,
-                errorMessage
+            setMessages((previous) => [
+                ...previous,
+                {
+                    id: Date.now() + 1,
+                    sender: "ai",
+                    isError: true,
+                    text: `Sorry, I couldn't get a response. ${error.message}`,
+                    time: getTime(),
+                },
             ]);
         } finally {
             setLoading(false);
+            textareaRef.current?.focus();
         }
     };
-     const clearChat = () => {
-    if (messages.length === 0) {
-        return;
-    }
 
-    const firstUserMessage = messages.find(
-        (item) => item.sender === "user"
-    );
-    
+    const clearChat = () => {
+        if (messages.length === 0 || loading) return;
 
-    const conversation = {
-        id: Date.now(),
-        title: firstUserMessage
-            ? firstUserMessage.text.slice(0, 40)
-            : "New conversation",
-        messages: messages,
-        createdAt: new Date().toISOString()
+        const firstUserMessage = messages.find(
+            (item) => item.sender === "user"
+        );
+
+        setHistory((previousHistory) => [
+            {
+                id: Date.now(),
+                title: firstUserMessage
+                    ? firstUserMessage.text.slice(0, 40)
+                    : "New conversation",
+                messages,
+                createdAt: new Date().toISOString(),
+            },
+            ...previousHistory,
+        ]);
+
+        setMessages([]);
     };
-      setHistory((previousHistory) => [
-        conversation,
-        ...previousHistory
-    ]);
 
+    const handleKeyDown = (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    };
 
-    setMessages([]);
-};
-   
+    const suggestions = [
+        "Explain a coding concept",
+        "Help me debug my code",
+        "Give me project ideas",
+    ];
 
     return (
         <section className="chat-page">
-
-            <div className="page-header chat-page-header">
-
+            <header className="page-header chat-page-header">
                 <div>
-                    <p className="page-label">
-                        AI ASSISTANT
-                    </p>
-
+                    <p className="page-label">AI ASSISTANT</p>
                     <h1>AI Chat</h1>
-
                     <p>
-                        Ask questions, brainstorm ideas and get help.
+                        Ask questions, explore ideas, and solve problems
+                        with NexaAI.
                     </p>
                 </div>
 
                 {messages.length > 0 && (
                     <button
+                        type="button"
                         className="clear-chat-btn"
                         onClick={clearChat}
+                        disabled={loading}
                     >
-                        + New Chat
+                        Clear conversation
                     </button>
                 )}
-
-            </div>
+            </header>
 
             <div className="chat-container">
-
                 <div className="messages">
-
                     {messages.length === 0 ? (
-
                         <div className="empty-chat">
-
-                            <div className="chat-icon">
-                                ✦
-                            </div>
-
-                            <h2>
-                                How can I help you?
-                            </h2>
-
+                            <span className="chat-icon">✦</span>
+                            <h2>How can I help you today?</h2>
                             <p>
-                                Ask me anything or choose a suggestion below.
+                                Ask a question or choose a suggestion
+                                to get started.
                             </p>
 
                             <div className="chat-suggestions">
-
-                                <button
-                                    onClick={() =>
-                                        setMessage(
-                                            "Give me some startup ideas"
-                                        )
-                                    }
-                                >
-                                    💡 Give me startup ideas
-                                </button>
-
-                                <button
-                                    onClick={() =>
-                                        setMessage(
-                                            "Help me learn React"
-                                        )
-                                    }
-                                >
-                                    ⚛️ Help me learn React
-                                </button>
-
-                                <button
-                                    onClick={() =>
-                                        setMessage(
-                                            "Write a professional email"
-                                        )
-                                    }
-                                >
-                                    ✉️ Write an email
-                                </button>
-
+                                {suggestions.map((suggestion) => (
+                                    <button
+                                        type="button"
+                                        key={suggestion}
+                                        onClick={() =>
+                                            sendMessage(suggestion)
+                                        }
+                                    >
+                                        {suggestion}
+                                    </button>
+                                ))}
                             </div>
-
                         </div>
-
                     ) : (
-
                         <div className="message-list">
-
                             {messages.map((item) => (
-
-                                <div
+                                <article
                                     key={item.id}
-                                    className={`message ${item.sender}`}
+                                    className={`message ${
+                                        item.sender === "user"
+                                            ? "user"
+                                            : "ai"
+                                    } ${item.isError ? "error-message" : ""}`}
                                 >
-
                                     <div className="message-avatar">
-                                        {item.sender === "user"
-                                            ? "S"
-                                            : "✦"}
+                                        {item.sender === "user" ? "You" : "✦"}
                                     </div>
 
                                     <div className="message-body">
-
                                         <div className="message-top">
                                             <strong>
                                                 {item.sender === "user"
                                                     ? "You"
                                                     : "NexaAI"}
                                             </strong>
-
-                                            <span>
-                                                {item.time}
-                                            </span>
+                                            <span>{item.time}</span>
                                         </div>
 
-                                        <p>
+                                        <p
+                                            style={{
+                                                whiteSpace: "pre-wrap",
+                                            }}
+                                        >
                                             {item.text}
                                         </p>
-
                                     </div>
-
-                                </div>
-
+                                </article>
                             ))}
 
                             {loading && (
-
-                                <div className="message ai">
-
-                                    <div className="message-avatar">
-                                        ✦
-                                    </div>
+                                <article className="message ai">
+                                    <div className="message-avatar">✦</div>
 
                                     <div className="message-body">
-
                                         <div className="message-top">
-                                            <strong>
-                                                NexaAI
-                                            </strong>
+                                            <strong>NexaAI</strong>
                                         </div>
 
-                                        <div className="typing">
-                                            <span></span>
-                                            <span></span>
-                                            <span></span>
+                                        <div
+                                            className="typing"
+                                            role="status"
+                                            aria-label="NexaAI is thinking"
+                                        >
+                                            <span />
+                                            <span />
+                                            <span />
                                         </div>
-
                                     </div>
-
-                                </div>
-
+                                </article>
                             )}
 
+                            <div ref={messagesEndRef} />
                         </div>
-
                     )}
-
                 </div>
 
-                <div className="chat-input">
-
+                <form
+                    className="chat-input"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        sendMessage();
+                    }}
+                >
                     <textarea
+                        ref={textareaRef}
                         value={message}
-                        onChange={(e) =>
-                            setMessage(e.target.value)
+                        onChange={(event) =>
+                            setMessage(event.target.value)
                         }
+                        onKeyDown={handleKeyDown}
                         placeholder="Message NexaAI..."
-                        rows="1"
-                        onKeyDown={(e) => {
-                            if (
-                                e.key === "Enter" &&
-                                !e.shiftKey
-                            ) {
-                                e.preventDefault();
-                                sendMessage();
-                            }
-                        }}
+                        aria-label="Message NexaAI"
+                        rows={1}
+                        disabled={loading}
                     />
 
                     <button
-                        onClick={sendMessage}
-                        disabled={
-                            !message.trim() || loading
-                        }
+                        type="submit"
+                        aria-label="Send message"
+                        disabled={loading || !message.trim()}
                     >
-                        ↑
+                        {loading ? "…" : "↑"}
                     </button>
-
-                </div>
+                </form>
 
                 <p className="chat-disclaimer">
-                    NexaAI can make mistakes. Check important information.
+                    Enter to send · Shift + Enter for a new line
                 </p>
-
             </div>
-
         </section>
     );
 }
 
 export default Chat;
-
